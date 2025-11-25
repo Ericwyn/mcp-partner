@@ -94,37 +94,56 @@ export class McpClient {
               const chunk = decoder.decode(value, { stream: true });
               buffer += chunk;
               
-              // Process buffer for events (separated by double newline)
-              // We split by \n\n to separate events
-              const parts = buffer.split(/\n\n/);
-              
-              // The last part is either empty (if buffer ended with \n\n) or incomplete
-              // Keep it in the buffer for the next chunk
-              buffer = parts.pop() || '';
-
-              for (const part of parts) {
-                  if (!part.trim()) continue;
+              // Robust parsing loop to handle various line endings (CRLF, LF, CR)
+              // Standard SSE events are separated by a pair of newlines.
+              while (true) {
+                  // Find the first occurrence of a double newline sequence
+                  // \n\n (LF LF) - Standard/Unix
+                  // \r\n\r\n (CRLF CRLF) - Windows/HTTP
+                  // \r\r (CR CR) - Old Mac (rare but possible)
+                  const match = buffer.match(/(\n\n|\r\n\r\n|\r\r)/);
                   
-                  const lines = part.split('\n');
+                  if (!match || match.index === undefined) {
+                      // No complete event in buffer yet
+                      break;
+                  }
+
+                  // Extract the event block
+                  const eventBlock = buffer.substring(0, match.index);
+                  // Advance buffer past this event and the separator
+                  buffer = buffer.substring(match.index + match[0].length);
+
+                  if (!eventBlock.trim()) {
+                      // Empty block (e.g. keep-alive or extra newlines), skip
+                      continue;
+                  }
+
+                  // Process the event lines
+                  const lines = eventBlock.split(/\r\n|\r|\n/);
                   let eventType = 'message';
                   let data = '';
 
                   for (const line of lines) {
-                      if (line.startsWith('event: ')) {
-                          eventType = line.substring(7).trim();
-                      } else if (line.startsWith('data: ')) {
-                          // Standard SSE: concatenate data lines. 
-                          // JSON content usually doesn't care about missing newlines between data lines 
-                          // unless strings are split across lines, which we assume JSON stringify doesn't do aggressively.
-                          data += line.substring(6);
+                      // Check for 'event:' or 'event: '
+                      if (line.startsWith('event:')) {
+                          eventType = line.substring(6).trim();
+                      } 
+                      // Check for 'data:' or 'data: '
+                      else if (line.startsWith('data:')) {
+                          let d = line.substring(5);
+                          // Remove optional leading space
+                          if (d.startsWith(' ')) d = d.substring(1);
+                          data += d;
                       }
                   }
 
                   if (eventType === 'endpoint') {
                       try {
                           const url = data.trim();
+                          // Resolve relative URLs against the original SSE URL
                           const resolvedUrl = new URL(url, this.originalSseUrl).toString();
 
+                          // Apply proxy prefix if enabled
                           if (this.proxyConfig.enabled) {
                               this.postUrl = this.proxyConfig.prefix + resolvedUrl;
                           } else {
@@ -137,7 +156,9 @@ export class McpClient {
                               resolve();
                           }
                       } catch (e) {
+                          console.error("Endpoint parsing error", e);
                           this.emitError(`Invalid endpoint URL: ${data}`);
+                          // If we can't parse endpoint, connection is effectively useless for requests
                           if (!resolved) reject(e);
                       }
                   } else if (eventType === 'message') {
@@ -147,7 +168,7 @@ export class McpClient {
                             this.handleIncomingMessage(json);
                           }
                       } catch (e) {
-                          console.error("Failed to parse SSE message", data);
+                          console.error("Failed to parse SSE message JSON", e, data);
                       }
                   }
               }

@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { McpTool, Language } from '../types';
-import { Play, Code2, Info, Copy, Check, FileText, Braces, Loader2, Terminal, Eraser } from 'lucide-react';
+import { Play, Code2, Info, Copy, Check, FileText, Braces, Loader2, Terminal, Eraser, X } from 'lucide-react';
 import { translations } from '../utils/i18n';
 import { PanelGroup, Panel, PanelResizeHandle } from 'react-resizable-panels';
 
@@ -21,6 +21,7 @@ export const RequestPanel: React.FC<RequestPanelProps> = ({ tool, onExecute, isE
   const [mode, setMode] = useState<'form' | 'json'>('form');
   const [copied, setCopied] = useState(false);
   const [responseCopied, setResponseCopied] = useState(false);
+  const [showDescModal, setShowDescModal] = useState(false);
 
   const t = translations[lang];
 
@@ -30,6 +31,7 @@ export const RequestPanel: React.FC<RequestPanelProps> = ({ tool, onExecute, isE
         setArgsJson(savedArgs || '{}');
         setJsonError(null);
         setMode('form');
+        setShowDescModal(false);
     }
   }, [tool?.name]); 
 
@@ -105,6 +107,11 @@ export const RequestPanel: React.FC<RequestPanelProps> = ({ tool, onExecute, isE
     }
   }, [argsJson]);
 
+  // Check if description is long enough to warrant a modal
+  const hasLongDesc = useMemo(() => {
+      return tool?.description && tool.description.length > 100;
+  }, [tool]);
+
   if (!tool) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 text-gray-400 dark:text-gray-500 select-none transition-colors duration-200">
@@ -115,7 +122,7 @@ export const RequestPanel: React.FC<RequestPanelProps> = ({ tool, onExecute, isE
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-gray-50 dark:bg-gray-900 h-full overflow-hidden transition-colors duration-200">
+    <div className="flex-1 flex flex-col bg-gray-50 dark:bg-gray-900 h-full overflow-hidden transition-colors duration-200 relative">
         {/* Header */}
         <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-850 flex items-start justify-between shadow-sm z-10 shrink-0">
             <div className="min-w-0 pr-4">
@@ -123,7 +130,18 @@ export const RequestPanel: React.FC<RequestPanelProps> = ({ tool, onExecute, isE
                     <span className="text-blue-600 dark:text-blue-400 font-mono text-base px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 rounded border border-blue-100 dark:border-blue-800 shrink-0">{t.toolCall}</span>
                     <span className="truncate">{tool.name}</span>
                 </h2>
-                <p className="text-gray-500 dark:text-gray-400 text-sm mt-2 max-w-2xl leading-relaxed line-clamp-2" title={tool.description}>{tool.description}</p>
+                <div className="mt-2">
+                    <p className="text-gray-500 dark:text-gray-400 text-sm leading-relaxed line-clamp-2" title={tool.description}>{tool.description}</p>
+                    {hasLongDesc && (
+                        <button 
+                            onClick={() => setShowDescModal(true)}
+                            className="text-xs text-blue-600 dark:text-blue-400 hover:underline mt-1 flex items-center gap-1 font-medium"
+                        >
+                            <Info className="w-3 h-3" />
+                            {t.viewFullDescription}
+                        </button>
+                    )}
+                </div>
             </div>
             <button
                 onClick={handleRun}
@@ -341,6 +359,40 @@ export const RequestPanel: React.FC<RequestPanelProps> = ({ tool, onExecute, isE
                 </Panel>
             </PanelGroup>
         </div>
+
+        {/* Full Description Modal */}
+        {showDescModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                <div className="bg-white dark:bg-gray-850 rounded-lg shadow-xl w-full max-w-2xl flex flex-col max-h-[85vh] border border-gray-200 dark:border-gray-700 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 shrink-0">
+                        <h3 className="font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                            <Info className="w-4 h-4 text-blue-500" />
+                            {t.toolDescription}
+                        </h3>
+                        <button 
+                            onClick={() => setShowDescModal(false)}
+                            className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700"
+                            title={t.close}
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
+                    <div className="flex-1 overflow-auto p-4">
+                        <pre className="whitespace-pre-wrap font-mono text-sm text-gray-800 dark:text-gray-300 bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg border border-gray-200 dark:border-gray-800">
+                            {tool.description}
+                        </pre>
+                    </div>
+                    <div className="p-3 border-t border-gray-200 dark:border-gray-700 flex justify-end shrink-0">
+                         <button 
+                            onClick={() => setShowDescModal(false)}
+                            className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-sm font-medium rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                        >
+                            {t.close}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
     </div>
   );
 };
