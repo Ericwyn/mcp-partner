@@ -1,20 +1,34 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# MCP Partner
 
-# Run and deploy your AI Studio app
+A Postman-like interface for testing and interacting with Model Context Protocol (MCP) Servers via SSE.
 
-This contains everything you need to run your app locally.
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Version](https://img.shields.io/badge/version-0.0.2-green.svg)
 
-View your app in AI Studio: https://ai.studio/apps/drive/1L454ISZ7IGFrHCWHeu7d8XSpEP7EyJd2
+## Features
 
-## Run Locally
+- **SSE Connection**: Connect to any MCP compliant Server-Sent Events endpoint.
+- **Tool Discovery**: Automatically lists available tools from the connected server.
+- **Interactive Testing**:
+  - **Form Mode**: User-friendly form generation based on the tool's input schema.
+  - **JSON Mode**: Raw JSON editor for complex arguments.
+- **State Persistence**: Remembers your parameters and execution results for each tool during the session.
+- **Request Logging**: Real-time console showing JSON-RPC traffic (requests, responses, notifications).
+- **History**: Saves previously connected server configurations for quick access.
+- **Customization**: Support for Custom Headers and CORS Proxy.
+- **Theme**: Light and Dark mode support.
+- **i18n**: English and Chinese language support.
 
-**Prerequisites:**  Node.js
+## Usage
 
+1. Open the application.
+2. Enter your MCP Server SSE URL (e.g., `http://localhost:3000/sse`).
+3. (Optional) Configure Proxy or Headers if needed.
+4. Click Connect.
+5. Select a tool from the sidebar.
+6. Enter arguments and click Send.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## Project
+
+- **Author**: [@Ericwyn](https://github.com/Ericwyn)
+- **Repository**: [https://github.com/Ericwyn/mcp-partner](https://github.com/Ericwyn/mcp-partner)
