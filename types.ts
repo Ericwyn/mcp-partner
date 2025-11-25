@@ -1,3 +1,4 @@
+
 export interface JsonRpcRequest {
   jsonrpc: '2.0';
   method: string;
@@ -57,3 +58,27 @@ export enum ConnectionStatus {
 
 export type Language = 'en' | 'zh';
 export type Theme = 'light' | 'dark';
+
+// --- Configuration Types ---
+
+export interface McpServerConfig {
+  url: string;
+  type: 'sse'; 
+  headers: Record<string, string>;
+}
+
+export interface McpExtensionConfig {
+  useProxy: boolean;
+  proxyPrefix: string;
+}
+
+export interface AppAppearanceConfig {
+  theme: Theme;
+  language: Language;
+}
+
+export interface McpPartnerConfig {
+  mcpServers: Record<string, McpServerConfig>;
+  mcpExtensions?: Record<string, McpExtensionConfig>;
+  appConfig?: AppAppearanceConfig;
+}
