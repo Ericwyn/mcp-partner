@@ -5,6 +5,10 @@
 
 一个类似 Postman 的工具，用于通过 SSE (Server-Sent Events) 测试和交互 Model Context Protocol (MCP) 服务器。
 
+点击此处直接访问
+
+[https://mcp-partner.vercel.app/](https://mcp-partner.vercel.app/)
+
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Version](https://img.shields.io/badge/version-0.0.5-green.svg)
 
@@ -30,9 +34,10 @@
 | :---: | :---: |
 | ![Default](screenshot/mcp-partner-screenshot-1.png) | ![Connected](screenshot/mcp-partner-screenshot-2.png) |
 
-| 3. 历史记录 & 配置管理 | |
+| 3. 历史记录 & 配置管理 | 4. 自动代理 |
 | :---: | :---: |
-| ![History](screenshot/mcp-partner-screenshot-3.png) | |
+| ![History](screenshot/mcp-partner-screenshot-3.png) | 
+![AutoProxy](screenshot/mcp-partner-screenshot-4.png) |
 
 ## 常见问题：CORS 跨域
 
@@ -45,7 +50,6 @@
    - 工具会自动在发送 JSON 数据前发送 `OPTIONS` 预检请求，确保复杂请求能通过严格的代理校验。
    - 推荐点击代理设置中的链接，部署一个自己的 Pancors 服务以获得最稳定的体验。
 
-![AutoProxy](screenshot/mcp-partner-screenshot-4.png)
 
 ## 使用说明
 
@@ -58,4 +62,5 @@
 
 ## 致谢
 
-感谢 Gemini 3 和 Google AI Studio
+感谢 Gemini 3 / Google AI Studio
+感谢 Vercel
