@@ -64,6 +64,7 @@ export const translations = {
     globalSettings: 'Settings',
     language: 'Language',
     theme: 'Appearance',
+    clearParams: 'Clear',
   },
   zh: {
     appTitle: 'MCP 调试助手',
@@ -127,5 +128,6 @@ export const translations = {
     globalSettings: '全局设置',
     language: '语言',
     theme: '外观',
+    clearParams: '清空参数',
   }
 };
