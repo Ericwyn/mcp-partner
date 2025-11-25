@@ -176,7 +176,7 @@ export const ConnectionBar: React.FC<ConnectionBarProps> = ({
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 flex items-center gap-4 shadow-sm transition-colors duration-200 relative z-50">
+    <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-1 flex items-center gap-4 shadow-sm transition-colors duration-200 relative z-50">
       {/* Title */}
       <div className="flex flex-col justify-center shrink-0">
         <div className="font-black text-xl text-blue-600 dark:text-blue-400 leading-none tracking-tight">MCP Partner</div>
