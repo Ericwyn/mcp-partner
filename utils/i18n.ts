@@ -1,4 +1,5 @@
 
+
 import { Language } from '../types';
 
 export const translations = {
@@ -80,6 +81,7 @@ export const translations = {
     save: 'Save',
     cancel: 'Cancel',
     serverNameExists: 'Name exists',
+    defaultProxy: 'Default Proxy URL',
   },
   zh: {
     appTitle: 'MCP 调试助手',
@@ -159,5 +161,6 @@ export const translations = {
     save: '保存',
     cancel: '取消',
     serverNameExists: '名称已存在',
+    defaultProxy: '默认代理地址',
   }
 };

@@ -30,12 +30,20 @@ interface ServerListItem {
     headers: HeaderItem[];
 }
 
+const DEFAULT_PROXY_URL = 'https://corsproxy.io/?url=';
+
 export const ConnectionBar: React.FC<ConnectionBarProps> = ({ 
   status, onConnect, onDisconnect, lang, setLang, theme, toggleTheme 
 }) => {
   const [url, setUrl] = useState('http://localhost:3000/sse');
+  
+  // Global Default Proxy State
+  const [globalProxyPrefix, setGlobalProxyPrefix] = useState(() => {
+      return localStorage.getItem('mcp_default_proxy_url') || DEFAULT_PROXY_URL;
+  });
+
   const [useProxy, setUseProxy] = useState(false);
-  const [proxyPrefix, setProxyPrefix] = useState('https://corsproxy.io/?url=');
+  const [proxyPrefix, setProxyPrefix] = useState(globalProxyPrefix);
   
   // Popover visibility states
   const [showSettings, setShowSettings] = useState(false); // Proxy Settings
@@ -160,8 +168,14 @@ export const ConnectionBar: React.FC<ConnectionBarProps> = ({
     // Load last used settings for current inputs
     const lastProxy = localStorage.getItem('mcp_last_use_proxy');
     const lastPrefix = localStorage.getItem('mcp_last_proxy_prefix');
+    
     if (lastProxy !== null) setUseProxy(lastProxy === 'true');
-    if (lastPrefix !== null) setProxyPrefix(lastPrefix);
+    // If we have a last prefix, use it. Otherwise fall back to global default.
+    if (lastPrefix !== null) {
+        setProxyPrefix(lastPrefix);
+    } else {
+        setProxyPrefix(globalProxyPrefix);
+    }
 
   }, []);
 
@@ -177,7 +191,9 @@ export const ConnectionBar: React.FC<ConnectionBarProps> = ({
   // Persist current transient UI inputs
   useEffect(() => { localStorage.setItem('mcp_last_use_proxy', String(useProxy)); }, [useProxy]);
   useEffect(() => { localStorage.setItem('mcp_last_proxy_prefix', proxyPrefix); }, [proxyPrefix]);
-
+  
+  // Persist Global Proxy Setting
+  useEffect(() => { localStorage.setItem('mcp_default_proxy_url', globalProxyPrefix); }, [globalProxyPrefix]);
 
   // Helper: Upsert configuration
   const upsertServerConfig = (customName?: string) => {
@@ -261,7 +277,7 @@ export const ConnectionBar: React.FC<ConnectionBarProps> = ({
       });
 
       const effectiveProxyPrefix = (useProxy && !proxyPrefix.trim()) 
-          ? 'https://corsproxy.io/?url=' 
+          ? globalProxyPrefix 
           : proxyPrefix;
 
       onConnect(url, { enabled: useProxy, prefix: effectiveProxyPrefix }, headerObj);
@@ -298,6 +314,7 @@ export const ConnectionBar: React.FC<ConnectionBarProps> = ({
           setProxyPrefix(extension.proxyPrefix);
       } else {
           setUseProxy(false);
+          setProxyPrefix(globalProxyPrefix);
       }
 
       setShowHistory(false);
@@ -364,7 +381,8 @@ export const ConnectionBar: React.FC<ConnectionBarProps> = ({
           mcpExtensions: extensionRegistry,
           appConfig: {
               theme,
-              language: lang
+              language: lang,
+              defaultProxyUrl: globalProxyPrefix
           }
       };
       setAppConfigText(JSON.stringify(exportData, null, 2));
@@ -418,6 +436,7 @@ export const ConnectionBar: React.FC<ConnectionBarProps> = ({
           if (parsed.appConfig) {
               if (parsed.appConfig.language) localStorage.setItem('mcp_language', parsed.appConfig.language);
               if (parsed.appConfig.theme) localStorage.setItem('mcp_theme', parsed.appConfig.theme);
+              if (parsed.appConfig.defaultProxyUrl) localStorage.setItem('mcp_default_proxy_url', parsed.appConfig.defaultProxyUrl);
           }
 
           window.location.reload();
@@ -702,7 +721,7 @@ export const ConnectionBar: React.FC<ConnectionBarProps> = ({
                                     className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-200 text-sm rounded-md p-2 focus:ring-green-500 focus:border-green-500"
                                     value={proxyPrefix}
                                     onChange={e => setProxyPrefix(e.target.value)}
-                                    placeholder="Default: https://corsproxy.io/?url="
+                                    placeholder={`Default: ${globalProxyPrefix}`}
                                 />
                                 <a 
                                   href="https://github.com/Ericwyn/pancors" 
@@ -763,7 +782,7 @@ export const ConnectionBar: React.FC<ConnectionBarProps> = ({
            </button>
            
            {showGlobalMenu && (
-               <div ref={globalMenuRef} className="absolute right-0 top-full mt-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 py-1">
+               <div ref={globalMenuRef} className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 py-1">
                    <div className="px-3 py-2 border-b border-gray-100 dark:border-gray-700 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                        {t.globalSettings}
                    </div>
@@ -793,6 +812,17 @@ export const ConnectionBar: React.FC<ConnectionBarProps> = ({
                        </div>
                        {theme === 'light' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
                    </button>
+
+                   {/* Default Proxy Config */}
+                   <div className="px-4 py-2.5 border-t border-gray-100 dark:border-gray-700">
+                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">{t.defaultProxy}</label>
+                        <input 
+                            type="text"
+                            value={globalProxyPrefix}
+                            onChange={(e) => setGlobalProxyPrefix(e.target.value)}
+                            className="w-full text-xs px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder-gray-400"
+                        />
+                   </div>
 
                     {/* Import/Export Toggle (Now App Config) */}
                     <button 
