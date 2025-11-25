@@ -73,6 +73,7 @@ export const translations = {
     importExportDesc: 'Edit the JSON below to import configurations, or copy it to export.',
     saveAndReload: 'Save & Reload',
     invalidJson: 'Invalid JSON format',
+    deployPancors: 'Or deploy a pancors proxy',
   },
   zh: {
     appTitle: 'MCP 调试助手',
@@ -145,5 +146,6 @@ export const translations = {
     importExportDesc: '编辑下方 JSON 以导入配置，或复制内容以导出。',
     saveAndReload: '保存并重载',
     invalidJson: 'JSON 格式无效',
+    deployPancors: '或者部署一个 pancors 代理',
   }
 };
