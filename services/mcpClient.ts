@@ -38,11 +38,11 @@ export class McpClient {
         const connectionUrl = proxyConfig.enabled ? proxyConfig.prefix + sseUrl : sseUrl;
 
         // Use fetch instead of EventSource to support headers
+        // REMOVED 'Cache-Control': 'no-cache' to prevent CORS errors with strict servers
         const response = await fetch(connectionUrl, {
             method: 'GET',
             headers: {
                 'Accept': 'text/event-stream',
-                'Cache-Control': 'no-cache',
                 ...this.headers
             },
             signal: this.abortController.signal
