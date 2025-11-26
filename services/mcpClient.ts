@@ -69,7 +69,7 @@ export class McpClient {
 
       } catch (err: any) {
         if (err.name === 'AbortError') {
-            // Ignore abort errors on disconnect
+            reject(new Error('Connection aborted'));
         } else {
             reject(err);
         }

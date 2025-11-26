@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { ConnectionStatus, Language, Theme, McpPartnerConfig, McpServerConfig, McpExtensionConfig } from '../types';
 import { Plug, Unplug, Loader2, Moon, Sun, Settings, Globe, List, Plus, Trash2, History, Save, MoreVertical, Monitor, Languages, Shield, ShieldCheck, ArrowRightLeft, Copy, Check, X, FileJson, Pencil, HardDrive } from 'lucide-react';
@@ -285,7 +284,7 @@ export const ConnectionBar: React.FC<ConnectionBarProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (isConnected) {
+    if (isConnected || isConnecting) {
       onDisconnect();
     } else {
       const headerObj: Record<string, string> = {};
@@ -877,22 +876,23 @@ export const ConnectionBar: React.FC<ConnectionBarProps> = ({
         {/* Connect Button */}
         <button 
           type="submit" 
-          disabled={isConnecting}
           className={`flex items-center gap-2 px-4 md:px-6 h-9 rounded-md font-medium text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-900 shrink-0 ${
             isConnected 
             ? 'bg-red-500 hover:bg-red-600 text-white focus:ring-red-500' 
+            : isConnecting
+            ? 'bg-amber-500 hover:bg-amber-600 text-white focus:ring-amber-500'
             : 'bg-blue-600 text-white hover:bg-blue-500 focus:ring-blue-500'
-          } ${isConnecting ? 'opacity-70 cursor-wait' : ''}`}
+          }`}
         >
           {isConnecting ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
+            <X className="w-4 h-4" />
           ) : isConnected ? (
             <Unplug className="w-4 h-4" />
           ) : (
             <Plug className="w-4 h-4" />
           )}
           <span className="hidden sm:inline">
-            {isConnecting ? t.connecting : isConnected ? t.disconnect : t.connect}
+            {isConnecting ? t.cancel : isConnected ? t.disconnect : t.connect}
           </span>
         </button>
 

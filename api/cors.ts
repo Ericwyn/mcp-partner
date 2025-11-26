@@ -46,7 +46,9 @@ export default async function handler(req: Request) {
       'sec-fetch-dest',
       'sec-fetch-mode',
       'sec-fetch-site',
-      'sec-fetch-user'
+      'sec-fetch-user',
+      'cookie',
+      'user-agent'
     ];
     
     // Copy headers from the incoming request, excluding unsafe ones
