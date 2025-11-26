@@ -1,15 +1,19 @@
 import { IMcpClient, ProxyConfig, MessageHandler, ErrorHandler, Unsubscribe } from './mcpClient';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { JsonRpcMessage } from '../types';
 
 /**
- * A wrapper Transport that intercepts messages for logging purposes
- * before passing them to/from the actual StreamableHTTPClientTransport.
+ * Custom Transport implementation for Streamable HTTP that uses fetch for both
+ * GET (SSE) and POST operations, supporting custom headers and proxies.
+ * 
+ * This replaces the SDK's default StreamableHTTPClientTransport which defaults to
+ * EventSource in browser environments.
  */
-class InterceptingTransport implements Transport {
-    private realTransport: StreamableHTTPClientTransport;
+class CustomStreamableTransport implements Transport {
+    private url: string;
+    private headers: Record<string, string>;
+    private abortController: AbortController | null = null;
     private messageLogger: MessageHandler;
 
     public onclose?: () => void;
@@ -17,45 +21,185 @@ class InterceptingTransport implements Transport {
     public onmessage?: (message: any) => void;
 
     constructor(url: string, headers: Record<string, string>, messageLogger: MessageHandler) {
-        // We instantiate the real SDK transport with a custom fetch implementation
-        // to ensure custom headers are included in the POST requests.
-        this.realTransport = new StreamableHTTPClientTransport(new URL(url), {
-            fetch: (input, init) => {
-                const finalHeaders = { ...headers, ...(init?.headers || {}) };
-                return fetch(input, { ...init, headers: finalHeaders });
-            }
-        });
+        this.url = url;
+        this.headers = headers;
         this.messageLogger = messageLogger;
-
-        // Hook into the real transport's callbacks
-        this.realTransport.onclose = () => {
-            if (this.onclose) this.onclose();
-        };
-
-        this.realTransport.onerror = (error) => {
-            if (this.onerror) this.onerror(error);
-        };
-
-        this.realTransport.onmessage = (message) => {
-            // Log the incoming message
-            this.messageLogger(message as JsonRpcMessage);
-            // Pass it up to the Client
-            if (this.onmessage) this.onmessage(message);
-        };
     }
 
     async start(): Promise<void> {
-        return this.realTransport.start();
+        this.abortController = new AbortController();
+        
+        try {
+            // Attempt to open SSE stream via GET as per spec "Listening for Messages from the Server"
+            const response = await fetch(this.url, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'text/event-stream',
+                    ...this.headers
+                },
+                signal: this.abortController.signal
+            });
+
+            if (!response.ok) {
+                // If 404 or 405, server might only support POST-based interaction.
+                // We log but do not throw, allowing the connection to proceed to the POST phase.
+                console.log(`GET SSE stream failed (${response.status}). Proceeding with POST-only mode.`);
+                return;
+            }
+
+            const contentType = response.headers.get('content-type') || '';
+            
+            // Critical fix: If server returns JSON (e.g. status info) instead of a stream, 
+            // we must not try to read it as an infinite SSE stream.
+            if (!contentType.includes('text/event-stream')) {
+                console.log(`GET endpoint returned '${contentType}', not 'text/event-stream'. Proceeding with POST-only mode.`);
+                // Consume body to free resources if possible
+                try { await response.text(); } catch {}
+                return;
+            }
+
+            if (!response.body) {
+                throw new Error('No response body received');
+            }
+
+            // Start reading the stream in the background
+            this.readSseStream(response.body);
+        } catch (e: any) {
+            if (e.name !== 'AbortError') {
+                 // Propagate error if start failed immediately
+                 console.warn("Failed to establish GET background stream:", e);
+                 // We don't throw here to allow POST-based communication to attempt to work
+            }
+        }
     }
 
     async send(message: any): Promise<void> {
-        // Log the outgoing message
-        this.messageLogger(message as JsonRpcMessage);
-        return this.realTransport.send(message);
+        this.messageLogger(message); // Log outgoing message
+        
+        try {
+            const response = await fetch(this.url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    // Spec requires Accept header for both JSON and SSE
+                    'Accept': 'application/json, text/event-stream',
+                    ...this.headers
+                },
+                body: JSON.stringify(message),
+                signal: this.abortController?.signal
+            });
+
+            if (!response.ok) {
+                const text = await response.text();
+                throw new Error(`POST Error ${response.status}: ${text}`);
+            }
+
+            // Critical fix: Handle the response body.
+            // The server might return the JSON-RPC response directly in the POST response.
+            const contentType = response.headers.get('content-type') || '';
+
+            if (contentType.includes('application/json')) {
+                const data = await response.json();
+                this.handleIncoming(data);
+            } else if (contentType.includes('text/event-stream')) {
+                // The server might start a stream specifically for this request
+                if (response.body) {
+                    this.readSseStream(response.body);
+                }
+            }
+            // If 202 Accepted, the response will come via the separate GET stream (handled in start)
+
+        } catch (e: any) {
+             if (this.onerror) this.onerror(e);
+             throw e;
+        }
     }
 
     async close(): Promise<void> {
-        return this.realTransport.close();
+        if (this.abortController) {
+            this.abortController.abort();
+            this.abortController = null;
+        }
+        if (this.onclose) this.onclose();
+    }
+
+    private handleIncoming(data: any) {
+        if (Array.isArray(data)) {
+            data.forEach(d => this.processMessage(d));
+        } else {
+            this.processMessage(data);
+        }
+    }
+
+    private processMessage(msg: any) {
+        // Log incoming message to UI
+        this.messageLogger(msg);
+        // Pass to SDK Client
+        if (this.onmessage) this.onmessage(msg);
+    }
+
+    private async readSseStream(stream: ReadableStream<Uint8Array>) {
+        const reader = stream.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        try {
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value, { stream: true });
+                buffer += chunk;
+
+                // Process buffer for complete events
+                while (true) {
+                    // Look for double newline which delimiters events
+                    const match = buffer.match(/(\n\n|\r\n\r\n|\r\r)/);
+                    if (!match || match.index === undefined) break;
+
+                    const eventBlock = buffer.substring(0, match.index);
+                    buffer = buffer.substring(match.index + match[0].length);
+
+                    if (!eventBlock.trim()) continue;
+
+                    this.parseEventBlock(eventBlock);
+                }
+            }
+        } catch (e: any) {
+            if (e.name !== 'AbortError' && this.onerror) {
+                console.error("SSE Stream Error:", e);
+                // Don't kill the whole transport on stream error, as POST might still work
+            }
+        } finally {
+            try {
+                reader.releaseLock();
+            } catch (e) {}
+        }
+    }
+
+    private parseEventBlock(block: string) {
+        const lines = block.split(/\r\n|\r|\n/);
+        let eventType = 'message';
+        let data = '';
+
+        for (const line of lines) {
+            if (line.startsWith('event:')) {
+                eventType = line.substring(6).trim();
+            } else if (line.startsWith('data:')) {
+                let d = line.substring(5);
+                if (d.startsWith(' ')) d = d.substring(1);
+                data += d;
+            }
+        }
+
+        if (eventType === 'message' && data) {
+            try {
+                const json = JSON.parse(data);
+                this.processMessage(json);
+            } catch (e) {
+                console.error('Failed to parse SSE message', e);
+            }
+        }
     }
 }
 
@@ -63,7 +207,7 @@ export class StreamableHttpMcpClient implements IMcpClient {
     private client: Client | null = null;
     private messageHandlers: MessageHandler[] = [];
     private errorHandlers: ErrorHandler[] = [];
-    private transport: InterceptingTransport | null = null;
+    private transport: CustomStreamableTransport | null = null;
 
     connect(url: string, proxyConfig: ProxyConfig, headers: Record<string, string>): Promise<void> {
         return new Promise(async (resolve, reject) => {
@@ -71,7 +215,6 @@ export class StreamableHttpMcpClient implements IMcpClient {
                 // Construct full URL with proxy if needed
                 const finalUrl = proxyConfig.enabled ? proxyConfig.prefix + url : url;
 
-                // Create the SDK Client
                 this.client = new Client(
                     {
                         name: 'mcp-partner-client',
@@ -82,12 +225,17 @@ export class StreamableHttpMcpClient implements IMcpClient {
                     }
                 );
 
-                // Initialize the Transport Interceptor
-                this.transport = new InterceptingTransport(
+                // Initialize the custom transport
+                this.transport = new CustomStreamableTransport(
                     finalUrl, 
                     headers, 
-                    (msg) => this.handleMessageLog(msg)
+                    (msg) => this.messageHandlers.forEach(h => h(msg))
                 );
+
+                // Handle transport errors (like stream disconnection)
+                this.transport.onerror = (err) => {
+                    this.emitError(err.message);
+                };
 
                 // Connect
                 await this.client.connect(this.transport);
@@ -103,11 +251,14 @@ export class StreamableHttpMcpClient implements IMcpClient {
 
     disconnect(): void {
         if (this.client) {
-            // We don't await this because disconnect is often synchronous-like in cleanup
             this.client.close().catch(e => console.error("Error closing client", e));
             this.client = null;
         }
-        this.transport = null;
+        // Ensure transport is closed if client close didn't do it
+        if (this.transport) {
+            this.transport.close().catch(e => console.error("Error closing transport", e));
+            this.transport = null;
+        }
         this.messageHandlers = [];
         this.errorHandlers = [];
     }
@@ -117,9 +268,7 @@ export class StreamableHttpMcpClient implements IMcpClient {
             throw new Error("Client not connected");
         }
 
-        // The SDK abstracts the ID generation, but our InterceptingTransport will capture the full JSON-RPC object
-        // so the logs will look correct.
-        // @ts-ignore - The SDK types might be strict about what methods are known, cast as any allows generic usage
+        // @ts-ignore - Generic request
         const result = await this.client.request({
             method: method,
             params: params
@@ -152,11 +301,6 @@ export class StreamableHttpMcpClient implements IMcpClient {
         return () => {
             this.errorHandlers = this.errorHandlers.filter(h => h !== handler);
         };
-    }
-
-    // Helper to broadcast to our logging system
-    private handleMessageLog(msg: JsonRpcMessage) {
-        this.messageHandlers.forEach(h => h(msg));
     }
 
     private emitError(msg: string) {
