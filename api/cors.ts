@@ -12,7 +12,8 @@ export default async function handler(req: Request) {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': '*',
-    'Access-Control-Expose-Headers': '*',
+    // Explicitly expose Mcp-Session-Id so client JS can read it
+    'Access-Control-Expose-Headers': '*, Mcp-Session-Id',
   };
 
   // Handle OPTIONS preflight
