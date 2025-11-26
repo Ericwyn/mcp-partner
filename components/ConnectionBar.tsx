@@ -432,8 +432,8 @@ export const ConnectionBar: React.FC<ConnectionBarProps> = ({
           }
 
           // Full reload/replace logic (with safe merge for servers)
-          let newServerRegistry = { ...serverRegistry };
-          let newExtensionRegistry = { ...extensionRegistry };
+          let newServerRegistry: Record<string, McpServerConfig> = { ...serverRegistry };
+          let newExtensionRegistry: Record<string, McpExtensionConfig> = { ...extensionRegistry };
 
           if (parsed.mcpServers) {
               Object.entries(parsed.mcpServers).forEach(([key, config]) => {
@@ -486,7 +486,7 @@ export const ConnectionBar: React.FC<ConnectionBarProps> = ({
       setConfigMode('single');
 
       // 1. Identify current config name if it matches a known URL
-      const foundEntry = Object.entries(serverRegistry).find(([_, cfg]) => cfg.url === url);
+      const foundEntry = Object.entries(serverRegistry).find(([_, cfg]) => (cfg as McpServerConfig).url === url);
       
       let keyName = foundEntry ? foundEntry[0] : 'new-mcp-server';
       // If we have a pending name for the current URL, use that as the display name
