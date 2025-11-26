@@ -30,7 +30,7 @@ interface ServerListItem {
     headers: HeaderItem[];
 }
 
-const DEFAULT_PROXY_URL = 'https://corsproxy.io/?url=';
+const DEFAULT_PROXY_URL = '/cors?url=';
 
 export const ConnectionBar: React.FC<ConnectionBarProps> = ({ 
   status, onConnect, onDisconnect, lang, setLang, theme, toggleTheme 
