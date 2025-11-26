@@ -1,4 +1,5 @@
 
+
 export interface JsonRpcRequest {
   jsonrpc: '2.0';
   method: string;
@@ -61,9 +62,11 @@ export type Theme = 'light' | 'dark';
 
 // --- Configuration Types ---
 
+export type TransportType = 'sse' | 'http';
+
 export interface McpServerConfig {
   url: string;
-  type: 'sse'; 
+  type: TransportType; 
   headers: Record<string, string>;
 }
 
