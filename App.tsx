@@ -22,6 +22,19 @@ interface ConnectionContext {
     transport: TransportType;
 }
 
+// Helper to ensure Error objects are logged with their message and stack
+const serializeError = (err: any) => {
+    if (err instanceof Error) {
+        return {
+            message: err.message,
+            name: err.name,
+            stack: err.stack,
+            cause: (err as any).cause
+        };
+    }
+    return err;
+};
+
 const App: React.FC = () => {
   const [status, setStatus] = useState<ConnectionStatus>(ConnectionStatus.DISCONNECTED);
   const [tools, setTools] = useState<McpTool[]>([]);
@@ -197,7 +210,13 @@ const App: React.FC = () => {
           return;
       }
       setStatus(ConnectionStatus.ERROR);
-      addLog({ type: 'error', direction: 'local', summary: 'Connection Failed', details: e.message, meta: connectionContext.current });
+      addLog({ 
+          type: 'error', 
+          direction: 'local', 
+          summary: 'Connection Failed', 
+          details: serializeError(e), 
+          meta: connectionContext.current 
+      });
     }
   };
 
@@ -220,7 +239,13 @@ const App: React.FC = () => {
         addLog({ type: 'info', direction: 'in', summary: `Loaded ${toolsList.length} tools`, meta: connectionContext.current });
         
     } catch (e: any) {
-        addLog({ type: 'error', direction: 'in', summary: 'Failed to list tools', details: e, meta: connectionContext.current });
+        addLog({ 
+            type: 'error', 
+            direction: 'in', 
+            summary: 'Failed to list tools', 
+            details: serializeError(e), 
+            meta: connectionContext.current 
+        });
     } finally {
         setLoadingTools(false);
     }
@@ -260,13 +285,20 @@ const App: React.FC = () => {
             }
         }));
     } catch (e: any) {
-        addLog({ type: 'error', direction: 'in', summary: `Tool Execution Failed`, details: e, meta: connectionContext.current });
+        const serialized = serializeError(e);
+        addLog({ 
+            type: 'error', 
+            direction: 'in', 
+            summary: `Tool Execution Failed`, 
+            details: serialized, 
+            meta: connectionContext.current 
+        });
         
         setToolStates(prev => ({
             ...prev,
             [selectedTool.name]: {
                  argsJson: prev[selectedTool.name]?.argsJson || JSON.stringify(args, null, 2),
-                 result: { status: 'error', data: e instanceof Error ? { message: e.message, stack: e.stack } : e }
+                 result: { status: 'error', data: serialized }
             }
         }));
     } finally {
