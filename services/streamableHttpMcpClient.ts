@@ -59,7 +59,6 @@ class CustomStreamableTransport implements Transport {
             const sessId = this.getMcpSessionId(response.headers);
             if (sessId) {
                 this.sessionId = sessId;
-                console.log('[HTTP] Session ID captured from GET response:', sessId);
             }
 
             const contentType = response.headers.get('content-type') || '';
@@ -89,18 +88,15 @@ class CustomStreamableTransport implements Transport {
     }
 
     getMcpSessionId(responseHeaders: Headers): string | undefined {
-        // for 循环
         // 遍历所有响应头
         for (const [key, value] of responseHeaders.entries()) {
             if (key.toLowerCase() === 'mcp-session-id') {
                 this.sessionId = value;
-                console.log('[HTTP] Session ID captured from GET response:', value);
-                break;
+                // console.log('[HTTP] Session ID captured:', value);
+                return value;
             }
         }
-        console.log('[HTTP] Session ID not found in GET response headers.');
-
-        return this.sessionId;
+        return undefined;
     }
 
     async send(message: any): Promise<void> {
@@ -125,22 +121,10 @@ class CustomStreamableTransport implements Transport {
                 signal: this.abortController?.signal
             });
 
-            if (JSON.stringify(message).indexOf('initialize') !== -1) {
-                console.log('send initialize message');
-
-                // 打印所有 response headers
-                let headersArr: Array<[string, string]> = [];
-                for (const [key, value] of response.headers.entries()) {
-                    headersArr.push([key, value]);
-                }
-                console.log('[HTTP] POST response headers:', headersArr);
-            }
-
             // Capture Session ID if presented
             const newSessionId = this.getMcpSessionId(response.headers);
             if (newSessionId) {
                 this.sessionId = newSessionId;
-                console.log('[HTTP] Session ID updated from POST response:', newSessionId);
             }
 
             if (!response.ok) {
