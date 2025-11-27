@@ -16,8 +16,8 @@ A Postman-like interface for testing and interacting with Model Context Protocol
 - **Protocol Support**: Connect via standard SSE (Server-Sent Events) or Streamable HTTP.
 - **Tool Discovery**: Automatically lists available tools from the connected server.
 - **Interactive Testing**:
-    - **Form Mode**: User-friendly form generation based on the tool's input schema.
-    - **JSON Mode**: Raw JSON editor for complex arguments.
+  - **Form Mode**: User-friendly form generation based on the tool's input schema.
+  - **JSON Mode**: Raw JSON editor for complex arguments.
 - **State Persistence**: Remembers your parameters and execution results for each tool during the session.
 - **Import / Export**: Easily backup or share your server configurations via JSON.
 - **Request Logging**: Real-time console showing JSON-RPC traffic (requests, responses, notifications).
@@ -46,8 +46,8 @@ To solve this, MCP Partner supports 3 proxy methods (configurable via the Shield
 1. **Vercel Deployment (Built-in)**: If deployed on Vercel, you can use `/cors?url=` as the proxy prefix (uses the project's own Edge Function).
 2. **Public Proxy**: Use a public proxy like `https://corsproxy.io/?url=`.
 3. **Pancors (Local Recommended)**: Run your own [Pancors](https://github.com/Ericwyn/pancors) locally.
-    - Optimized support included (automatically handles `OPTIONS` pre-flight requests).
-    - Recommended for local development and stability.
+   - Optimized support included (automatically handles `OPTIONS` pre-flight requests).
+   - Recommended for local development and stability.
 
 ## Usage
 
