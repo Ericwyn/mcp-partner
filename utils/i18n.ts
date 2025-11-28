@@ -117,7 +117,14 @@ export const translations = {
     prompts: 'Prompts',
     noArgsTool: 'This tool takes no arguments.',
     noArgsPrompt: 'This prompt takes no arguments.',
-    noDescription: 'No description'
+    noDescription: 'No description',
+    // New Translations
+    welcome: 'Welcome to MCP Partner',
+    importConfig: 'Import Config',
+    loadRecent: 'Load Recent',
+    viewAllServers: 'View All Servers',
+    lastUsed: 'Last used',
+    copyConfig: 'Copy Config'
   },
   zh: {
     appTitle: 'MCP 调试助手',
@@ -233,6 +240,13 @@ export const translations = {
     prompts: 'PROMPTS',
     noArgsTool: '该工具无需参数。',
     noArgsPrompt: '该提示词无需参数。',
-    noDescription: '暂无描述'
+    noDescription: '暂无描述',
+    // New Translations
+    welcome: '欢迎使用 MCP Partner',
+    importConfig: '导入配置',
+    loadRecent: '加载最近配置',
+    viewAllServers: '查看所有服务',
+    lastUsed: '上次使用',
+    copyConfig: '复制配置'
   }
 };

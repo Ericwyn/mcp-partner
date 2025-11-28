@@ -1,14 +1,14 @@
 
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { ConnectionBar } from './components/ConnectionBar';
+import { ConnectionBar, ConnectionBarRef } from './components/ConnectionBar';
 import { Sidebar } from './components/Sidebar';
 import { RequestPanel } from './components/RequestPanel';
 import { LogViewer } from './components/LogViewer';
 import { IMcpClient, ProxyConfig } from './services/mcpClient';
 import { SseMcpClient } from './services/sseMcpClient';
 import { StreamableHttpMcpClient } from './services/streamableHttpMcpClient';
-import { ConnectionStatus, LogEntry, McpTool, McpResource, McpPrompt, JsonRpcMessage, Language, Theme, TransportType } from './types';
+import { ConnectionStatus, LogEntry, McpTool, McpResource, McpPrompt, JsonRpcMessage, Language, Theme, TransportType, McpServerConfig, McpExtensionConfig } from './types';
 import { PanelGroup, Panel, PanelResizeHandle } from 'react-resizable-panels';
 import { Github } from 'lucide-react';
 import { APP_VERSION, REPO_URL } from './constants';
@@ -37,6 +37,16 @@ const serializeError = (err: any) => {
         };
     }
     return err;
+};
+
+// Helper for normalization
+const normalizeTransport = (t: string | undefined | null): TransportType => {
+    if (!t) return 'sse';
+    const val = String(t).trim().toLowerCase();
+    if (val === 'http' || val === 'streamable_http' || val === 'streamable http') {
+        return 'streamable_http';
+    }
+    return 'sse';
 };
 
 const App: React.FC = () => {
@@ -70,9 +80,32 @@ const App: React.FC = () => {
       return (saved === 'dark' || saved === 'light') ? saved : 'light';
   });
 
+  // --- Lifted State from ConnectionBar ---
+  // Config Registries - Initialize lazily from localStorage to prevent overwriting on mount
+  const [serverRegistry, setServerRegistry] = useState<Record<string, McpServerConfig>>(() => {
+      try {
+          const saved = localStorage.getItem('mcp_servers_registry');
+          return saved ? JSON.parse(saved) : {};
+      } catch (e) {
+          console.error("Failed to load server registry", e);
+          return {};
+      }
+  });
+
+  const [extensionRegistry, setExtensionRegistry] = useState<Record<string, McpExtensionConfig>>(() => {
+      try {
+          const saved = localStorage.getItem('mcp_extensions_registry');
+          return saved ? JSON.parse(saved) : {};
+      } catch (e) {
+          console.error("Failed to load extension registry", e);
+          return {};
+      }
+  });
+
   // Client ref, initialized with default SSE but can be swapped
   const mcpClient = useRef<IMcpClient>(new SseMcpClient());
   const activeTransport = useRef<TransportType>('sse');
+  const connectionBarRef = useRef<ConnectionBarRef>(null);
   
   // Store connection context to attach to logs
   const connectionContext = useRef<ConnectionContext | null>(null);
@@ -437,6 +470,37 @@ const App: React.FC = () => {
     }
   }
 
+  // --- New Handlers for Empty State Actions ---
+  
+  const handleImportConfig = () => {
+      connectionBarRef.current?.openServerConfigModal('single');
+  };
+
+  const handleLoadRecent = () => {
+      const keys = Object.keys(serverRegistry);
+      if (keys.length === 0) return;
+      
+      // Find the entry with the max lastConnected
+      let recentKey = keys[0];
+      let maxTime = serverRegistry[recentKey].lastConnected || 0;
+
+      for (const key of keys) {
+          const time = serverRegistry[key].lastConnected || 0;
+          if (time > maxTime) {
+              maxTime = time;
+              recentKey = key;
+          }
+      }
+
+      if (recentKey) {
+          connectionBarRef.current?.loadConfig(recentKey);
+      }
+  };
+
+  const handleViewAllConfigs = () => {
+      connectionBarRef.current?.openServerConfigModal('all');
+  };
+
   // Determine current active item and state
   let currentItem: McpTool | McpResource | McpPrompt | null = null;
   if (activeTab === 'tools') currentItem = selectedTool;
@@ -449,6 +513,7 @@ const App: React.FC = () => {
   return (
     <div className="h-screen w-screen flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-200 font-sans transition-colors duration-200">
       <ConnectionBar 
+        ref={connectionBarRef}
         status={status} 
         onConnect={handleConnect} 
         onDisconnect={handleDisconnect}
@@ -456,6 +521,10 @@ const App: React.FC = () => {
         setLang={setLang}
         theme={theme}
         toggleTheme={toggleTheme}
+        serverRegistry={serverRegistry}
+        setServerRegistry={setServerRegistry}
+        extensionRegistry={extensionRegistry}
+        setExtensionRegistry={setExtensionRegistry}
       />
       
       <div className="flex-1 flex overflow-hidden">
@@ -490,6 +559,9 @@ const App: React.FC = () => {
                             response={currentItemState?.result || null}
                             savedArgs={currentItemState?.argsJson || '{}'}
                             onArgsChange={handleArgsChange}
+                            onImportConfig={handleImportConfig}
+                            onLoadRecent={handleLoadRecent}
+                            onViewAllConfigs={handleViewAllConfigs}
                          />
                     </Panel>
                     
