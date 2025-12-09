@@ -118,20 +118,20 @@ export const RequestPanel: React.FC<RequestPanelProps> = ({ tool, onExecute, isE
     <div className="flex-1 flex flex-col bg-gray-50 dark:bg-gray-900 h-full overflow-hidden transition-colors duration-200">
         {/* Header */}
         <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-850 flex items-start justify-between shadow-sm z-10 shrink-0">
-            <div>
+            <div className="min-w-0 pr-4">
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                    <span className="text-blue-600 dark:text-blue-400 font-mono text-base px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 rounded border border-blue-100 dark:border-blue-800">{t.toolCall}</span>
-                    {tool.name}
+                    <span className="text-blue-600 dark:text-blue-400 font-mono text-base px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 rounded border border-blue-100 dark:border-blue-800 shrink-0">{t.toolCall}</span>
+                    <span className="truncate">{tool.name}</span>
                 </h2>
-                <p className="text-gray-500 dark:text-gray-400 text-sm mt-2 max-w-2xl leading-relaxed">{tool.description}</p>
+                <p className="text-gray-500 dark:text-gray-400 text-sm mt-2 max-w-2xl leading-relaxed line-clamp-2" title={tool.description}>{tool.description}</p>
             </div>
             <button
                 onClick={handleRun}
                 disabled={!!jsonError || isExecuting}
-                className={`flex items-center gap-2 px-6 py-2.5 rounded-md font-bold text-white shadow-lg transition-all transform active:scale-95 ${
+                className={`flex items-center gap-2 px-4 md:px-6 h-9 rounded-md font-medium text-sm text-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-900 shrink-0 ${
                     !!jsonError || isExecuting 
                     ? 'bg-gray-400 dark:bg-gray-700 cursor-not-allowed text-gray-200 dark:text-gray-400' 
-                    : 'bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 hover:shadow-blue-500/25'
+                    : 'bg-blue-600 hover:bg-blue-500 shadow-sm'
                 }`}
             >
                 <Play className={`w-4 h-4 ${isExecuting ? 'hidden' : 'fill-current'}`} />
