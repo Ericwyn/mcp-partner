@@ -8,6 +8,11 @@ import { McpClient, ProxyConfig } from './services/mcpClient';
 import { ConnectionStatus, LogEntry, McpTool, JsonRpcMessage, Language, Theme } from './types';
 import { PanelGroup, Panel, PanelResizeHandle } from 'react-resizable-panels';
 
+interface ToolState {
+    argsJson: string;
+    result: { status: 'success' | 'error', data: any } | null;
+}
+
 const App: React.FC = () => {
   const [status, setStatus] = useState<ConnectionStatus>(ConnectionStatus.DISCONNECTED);
   const [tools, setTools] = useState<McpTool[]>([]);
@@ -15,7 +20,9 @@ const App: React.FC = () => {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isExecuting, setIsExecuting] = useState(false);
   const [loadingTools, setLoadingTools] = useState(false);
-  const [lastResult, setLastResult] = useState<{ status: 'success' | 'error', data: any } | null>(null);
+  
+  // Store state (args + results) per tool name
+  const [toolStates, setToolStates] = useState<Record<string, ToolState>>({});
   
   // Settings
   const [lang, setLang] = useState<Language>('zh');
@@ -96,6 +103,7 @@ const App: React.FC = () => {
         }
     });
     setTools([]);
+    setToolStates({});
     
     try {
       await mcpClient.current.connect(url, proxyConfig, headers);
@@ -132,7 +140,7 @@ const App: React.FC = () => {
     setStatus(ConnectionStatus.DISCONNECTED);
     setTools([]);
     setSelectedTool(null);
-    setLastResult(null);
+    setToolStates({});
     addLog({ type: 'info', direction: 'local', summary: 'Disconnected' });
   };
 
@@ -153,13 +161,22 @@ const App: React.FC = () => {
 
   const handleSelectTool = (tool: McpTool) => {
       setSelectedTool(tool);
-      setLastResult(null);
+  };
+
+  const handleArgsChange = (argsJson: string) => {
+      if (!selectedTool) return;
+      setToolStates(prev => ({
+          ...prev,
+          [selectedTool.name]: {
+              ...(prev[selectedTool.name] || { result: null }),
+              argsJson
+          }
+      }));
   };
 
   const handleExecuteTool = async (args: any) => {
     if (!selectedTool) return;
     setIsExecuting(true);
-    setLastResult(null);
     
     try {
         const result = await mcpClient.current.sendRequest('tools/call', {
@@ -167,14 +184,30 @@ const App: React.FC = () => {
             arguments: args
         });
         addLog({ type: 'response', direction: 'in', summary: `Tool Executed: ${selectedTool.name}`, details: result });
-        setLastResult({ status: 'success', data: result });
+        
+        setToolStates(prev => ({
+            ...prev,
+            [selectedTool.name]: {
+                argsJson: prev[selectedTool.name]?.argsJson || JSON.stringify(args, null, 2),
+                result: { status: 'success', data: result }
+            }
+        }));
     } catch (e: any) {
         addLog({ type: 'error', direction: 'in', summary: `Tool Execution Failed`, details: e });
-        setLastResult({ status: 'error', data: e instanceof Error ? { message: e.message, stack: e.stack } : e });
+        
+        setToolStates(prev => ({
+            ...prev,
+            [selectedTool.name]: {
+                 argsJson: prev[selectedTool.name]?.argsJson || JSON.stringify(args, null, 2),
+                 result: { status: 'error', data: e instanceof Error ? { message: e.message, stack: e.stack } : e }
+            }
+        }));
     } finally {
         setIsExecuting(false);
     }
   };
+
+  const currentToolState = selectedTool ? toolStates[selectedTool.name] : null;
 
   return (
     <div className="h-screen w-screen flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-200 font-sans transition-colors duration-200">
@@ -211,7 +244,9 @@ const App: React.FC = () => {
                             onExecute={handleExecuteTool}
                             isExecuting={isExecuting}
                             lang={lang}
-                            response={lastResult}
+                            response={currentToolState?.result || null}
+                            savedArgs={currentToolState?.argsJson || '{}'}
+                            onArgsChange={handleArgsChange}
                          />
                     </Panel>
                     

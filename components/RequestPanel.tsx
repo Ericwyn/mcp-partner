@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { McpTool, Language } from '../types';
-import { Play, Code2, Info, Copy, Check, FileText, Braces, Loader2, Terminal } from 'lucide-react';
+import { Play, Code2, Info, Copy, Check, FileText, Braces, Loader2, Terminal, Eraser } from 'lucide-react';
 import { translations } from '../utils/i18n';
 import { PanelGroup, Panel, PanelResizeHandle } from 'react-resizable-panels';
 
@@ -11,10 +11,12 @@ interface RequestPanelProps {
   isExecuting: boolean;
   lang: Language;
   response: { status: 'success' | 'error', data: any } | null;
+  savedArgs: string;
+  onArgsChange: (args: string) => void;
 }
 
-export const RequestPanel: React.FC<RequestPanelProps> = ({ tool, onExecute, isExecuting, lang, response }) => {
-  const [argsJson, setArgsJson] = useState('{}');
+export const RequestPanel: React.FC<RequestPanelProps> = ({ tool, onExecute, isExecuting, lang, response, savedArgs, onArgsChange }) => {
+  const [argsJson, setArgsJson] = useState(savedArgs || '{}');
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [mode, setMode] = useState<'form' | 'json'>('form');
   const [copied, setCopied] = useState(false);
@@ -22,17 +24,18 @@ export const RequestPanel: React.FC<RequestPanelProps> = ({ tool, onExecute, isE
 
   const t = translations[lang];
 
-  // Reset when tool changes
+  // Sync local state when the selected tool changes (restore persisted args)
   useEffect(() => {
     if (tool) {
-        setArgsJson(JSON.stringify({}, null, 2));
+        setArgsJson(savedArgs || '{}');
         setJsonError(null);
         setMode('form');
     }
-  }, [tool]);
+  }, [tool?.name]); 
 
   const handleJsonChange = (val: string) => {
     setArgsJson(val);
+    onArgsChange(val); // Sync to parent
     try {
       JSON.parse(val);
       setJsonError(null);
@@ -45,11 +48,20 @@ export const RequestPanel: React.FC<RequestPanelProps> = ({ tool, onExecute, isE
     try {
         const currentArgs = JSON.parse(argsJson);
         const newArgs = { ...currentArgs, [key]: value };
-        setArgsJson(JSON.stringify(newArgs, null, 2));
+        const newJson = JSON.stringify(newArgs, null, 2);
+        setArgsJson(newJson);
+        onArgsChange(newJson); // Sync to parent
         setJsonError(null);
     } catch (e) {
         console.error("Cannot update form: JSON is invalid");
     }
+  };
+
+  const handleClearParams = () => {
+    const empty = '{}';
+    setArgsJson(empty);
+    onArgsChange(empty);
+    setJsonError(null);
   };
 
   const handleRun = () => {
@@ -159,14 +171,25 @@ export const RequestPanel: React.FC<RequestPanelProps> = ({ tool, onExecute, isE
                             </button>
                         </div>
 
-                        <button
-                            onClick={copyToClipboard}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                            title="Copy JSON to clipboard"
-                        >
-                            {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
-                            {copied ? t.copied : t.copy}
-                        </button>
+                        <div className="flex items-center gap-2">
+                             <button
+                                onClick={handleClearParams}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-red-500 dark:text-gray-400 dark:hover:text-red-400 transition-colors"
+                                title={t.clearParams}
+                            >
+                                <Eraser className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">{t.clearParams}</span>
+                            </button>
+
+                            <button
+                                onClick={copyToClipboard}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                title="Copy JSON to clipboard"
+                            >
+                                {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                                {copied ? t.copied : t.copy}
+                            </button>
+                        </div>
                      </div>
 
                      <div className="flex-1 relative overflow-hidden">
