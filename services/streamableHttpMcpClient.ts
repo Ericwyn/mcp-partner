@@ -1,3 +1,4 @@
+
 import { IMcpClient, ProxyConfig, MessageHandler, ErrorHandler, Unsubscribe } from './mcpClient';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
@@ -49,6 +50,13 @@ class CustomStreamableTransport implements Transport {
                 // We log but do not throw, allowing the connection to proceed to the POST phase.
                 console.log(`GET SSE stream failed (${response.status}). Proceeding with POST-only mode.`);
                 return;
+            }
+
+            // Capture session ID from GET response if present (some servers assign it on connection)
+            const sessId = response.headers.get('Mcp-Session-Id');
+            if (sessId) {
+                this.sessionId = sessId;
+                console.log('[HTTP] Session ID captured from GET response:', sessId);
             }
 
             const contentType = response.headers.get('content-type') || '';
@@ -103,6 +111,7 @@ class CustomStreamableTransport implements Transport {
             const newSessionId = response.headers.get('Mcp-Session-Id');
             if (newSessionId) {
                 this.sessionId = newSessionId;
+                console.log('[HTTP] Session ID updated from POST response:', newSessionId);
             }
 
             if (!response.ok) {

@@ -1,3 +1,4 @@
+
 import { JsonRpcMessage, JsonRpcResponse, JsonRpcRequest, JsonRpcNotification } from '../types';
 import { IMcpClient, ProxyConfig, MessageHandler, ErrorHandler, Unsubscribe } from './mcpClient';
 
@@ -47,6 +48,13 @@ export class SseMcpClient implements IMcpClient {
             this.emitError(msg);
             reject(new Error(msg));
             return;
+        }
+        
+        // Capture session ID from GET response if present (some servers assign it on connection)
+        const sessId = response.headers.get('Mcp-Session-Id');
+        if (sessId) {
+            this.sessionId = sessId;
+            console.log('[SSE] Session ID captured from GET response:', sessId);
         }
 
         if (!response.body) {
@@ -253,6 +261,7 @@ export class SseMcpClient implements IMcpClient {
       const sessId = res.headers.get('Mcp-Session-Id');
       if (sessId) {
           this.sessionId = sessId;
+          console.log('[SSE] Session ID updated from POST response:', sessId);
       }
 
       if (!res.ok) {
@@ -288,6 +297,8 @@ export class SseMcpClient implements IMcpClient {
       };
       if (this.sessionId) {
           reqHeaders['Mcp-Session-Id'] = this.sessionId;
+      } else {
+          console.warn('[SSE] Sending notification without Session ID. Server may reject if initialized.');
       }
 
       const res = await fetch(this.postUrl, {
