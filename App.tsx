@@ -3,7 +3,8 @@ import { ConnectionBar } from './components/ConnectionBar';
 import { Sidebar } from './components/Sidebar';
 import { RequestPanel } from './components/RequestPanel';
 import { LogViewer } from './components/LogViewer';
-import { McpClient, ProxyConfig } from './services/mcpClient';
+import { IMcpClient, ProxyConfig } from './services/mcpClient';
+import { SseMcpClient } from './services/sseMcpClient';
 import { ConnectionStatus, LogEntry, McpTool, JsonRpcMessage, Language, Theme } from './types';
 import { PanelGroup, Panel, PanelResizeHandle } from 'react-resizable-panels';
 import { Github } from 'lucide-react';
@@ -34,7 +35,8 @@ const App: React.FC = () => {
       return (saved === 'dark' || saved === 'light') ? saved : 'light';
   });
 
-  const mcpClient = useRef<McpClient>(new McpClient());
+  // Use the Interface for typing, but instantiate the concrete SSE implementation
+  const mcpClient = useRef<IMcpClient>(new SseMcpClient());
 
   // Apply Theme & Persist
   useEffect(() => {
