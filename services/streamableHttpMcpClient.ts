@@ -124,8 +124,16 @@ class CustomStreamableTransport implements Transport {
             const contentType = response.headers.get('content-type') || '';
 
             if (contentType.includes('application/json')) {
-                const data = await response.json();
-                this.handleIncoming(data);
+                // Safely handle potentially empty JSON bodies
+                const text = await response.text();
+                if (text && text.trim().length > 0) {
+                    try {
+                        const data = JSON.parse(text);
+                        this.handleIncoming(data);
+                    } catch (e) {
+                        console.error("Failed to parse JSON response from POST", e);
+                    }
+                }
             } else if (contentType.includes('text/event-stream')) {
                 // The server might start a stream specifically for this request
                 if (response.body) {
