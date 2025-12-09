@@ -252,11 +252,15 @@ export class McpClient {
     });
 
     try {
+      // Use text/plain to avoid CORS Preflight (OPTIONS) if possible.
+      // Most proxies fail to handle OPTIONS requests correctly.
+      // Standard headers like 'Accept' are "Simple Headers" and won't trigger preflight.
       const res = await fetch(this.postUrl, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          ...this.headers // Inject custom headers
+          'Content-Type': 'text/plain', 
+          'Accept': 'application/json',
+          ...this.headers // Inject custom headers (may trigger preflight if complex)
         },
         body: JSON.stringify(request)
       });
@@ -289,11 +293,13 @@ export class McpClient {
     this.messageHandlers.forEach(h => h(notification));
 
     try {
+      // Use text/plain to avoid CORS Preflight
       const res = await fetch(this.postUrl, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          ...this.headers // Inject custom headers
+          'Content-Type': 'text/plain',
+          'Accept': 'application/json',
+          ...this.headers 
         },
         body: JSON.stringify(notification)
       });
