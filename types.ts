@@ -75,6 +75,7 @@ export interface McpExtensionConfig {
 export interface AppAppearanceConfig {
   theme: Theme;
   language: Language;
+  defaultProxyUrl?: string;
 }
 
 export interface McpPartnerConfig {
