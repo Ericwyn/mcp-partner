@@ -252,15 +252,23 @@ export class McpClient {
     });
 
     try {
-      // Use text/plain to avoid CORS Preflight (OPTIONS) if possible.
-      // Most proxies fail to handle OPTIONS requests correctly.
-      // Standard headers like 'Accept' are "Simple Headers" and won't trigger preflight.
+      // 1. Explicitly send OPTIONS first as requested to support specific proxies (like pancors)
+      try {
+        await fetch(this.postUrl, {
+           method: 'OPTIONS',
+           headers: this.headers
+        });
+      } catch (optErr) {
+        // Ignore errors on the manual OPTIONS check; the browser's automatic preflight for the POST might still work
+        console.warn("Manual OPTIONS check failed", optErr);
+      }
+
+      // 2. Send actual POST with application/json
       const res = await fetch(this.postUrl, {
         method: 'POST',
         headers: {
-          'Content-Type': 'text/plain', 
-          'Accept': 'application/json',
-          ...this.headers // Inject custom headers (may trigger preflight if complex)
+          'Content-Type': 'application/json', 
+          ...this.headers 
         },
         body: JSON.stringify(request)
       });
@@ -293,12 +301,22 @@ export class McpClient {
     this.messageHandlers.forEach(h => h(notification));
 
     try {
-      // Use text/plain to avoid CORS Preflight
+      // 1. Explicitly send OPTIONS first
+      try {
+        await fetch(this.postUrl, {
+           method: 'OPTIONS',
+           headers: this.headers
+        });
+      } catch (optErr) {
+        // Ignore errors on the manual OPTIONS check
+        console.warn("Manual OPTIONS check failed", optErr);
+      }
+
+      // 2. Send actual POST with application/json
       const res = await fetch(this.postUrl, {
         method: 'POST',
         headers: {
-          'Content-Type': 'text/plain',
-          'Accept': 'application/json',
+          'Content-Type': 'application/json',
           ...this.headers 
         },
         body: JSON.stringify(notification)
