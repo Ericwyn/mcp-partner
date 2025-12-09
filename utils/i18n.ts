@@ -3,7 +3,7 @@ import { Language } from '../types';
 
 export const translations = {
   en: {
-    appTitle: 'MCP Partner',
+    appTitle: 'MCP Debug Tool',
     connect: 'Connect',
     disconnect: 'Disconnect',
     connecting: 'Connecting...',
