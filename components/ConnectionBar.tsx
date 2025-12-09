@@ -384,6 +384,14 @@ export const ConnectionBar: React.FC<ConnectionBarProps> = ({
                                     value={proxyPrefix}
                                     onChange={e => setProxyPrefix(e.target.value)}
                                 />
+                                <a 
+                                  href="https://github.com/Ericwyn/pancors" 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="block mt-1.5 text-[10px] text-blue-500 hover:text-blue-600 hover:underline text-right"
+                                >
+                                  {t.deployPancors}
+                                </a>
                             </div>
                         </div>
                     </div>
