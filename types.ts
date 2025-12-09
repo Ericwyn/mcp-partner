@@ -85,6 +85,7 @@ export interface McpServerConfig {
   url: string;
   type: TransportType; 
   headers: Record<string, string>;
+  lastConnected?: number;
 }
 
 export interface McpExtensionConfig {
