@@ -16,8 +16,8 @@ A Postman-like interface for testing and interacting with Model Context Protocol
 - **Protocol Support**: Connect via standard SSE (Server-Sent Events) or Streamable HTTP.
 - **Tool Discovery**: Automatically lists available tools from the connected server.
 - **Interactive Testing**:
-  - **Form Mode**: User-friendly form generation based on the tool's input schema.
-  - **JSON Mode**: Raw JSON editor for complex arguments.
+    - **Form Mode**: User-friendly form generation based on the tool's input schema.
+    - **JSON Mode**: Raw JSON editor for complex arguments.
 - **State Persistence**: Remembers your parameters and execution results for each tool during the session.
 - **Import / Export**: Easily backup or share your server configurations via JSON.
 - **Request Logging**: Real-time console showing JSON-RPC traffic (requests, responses, notifications).
@@ -25,6 +25,7 @@ A Postman-like interface for testing and interacting with Model Context Protocol
 - **Customization**: Support for Custom Headers and CORS Proxy.
 - **Theme**: Light and Dark mode support.
 - **i18n**: English and Chinese language support.
+- **PWA Support**: Installable as a standalone app on Desktop/Mobile.
 
 ## Screenshots
 
@@ -45,8 +46,8 @@ To solve this, MCP Partner supports 3 proxy methods (configurable via the Shield
 1. **Vercel Deployment (Built-in)**: If deployed on Vercel, you can use `/cors?url=` as the proxy prefix (uses the project's own Edge Function).
 2. **Public Proxy**: Use a public proxy like `https://corsproxy.io/?url=`.
 3. **Pancors (Local Recommended)**: Run your own [Pancors](https://github.com/Ericwyn/pancors) locally.
-   - Optimized support included (automatically handles `OPTIONS` pre-flight requests).
-   - Recommended for local development and stability.
+    - Optimized support included (automatically handles `OPTIONS` pre-flight requests).
+    - Recommended for local development and stability.
 
 ## Usage
 
@@ -57,6 +58,20 @@ To solve this, MCP Partner supports 3 proxy methods (configurable via the Shield
 5. Click Connect.
 6. Select a tool from the sidebar.
 7. Enter arguments and click Send.
+
+## Deployment
+
+### Vercel (Recommended)
+Click the "Deploy with Vercel" button above for one-click deployment. This includes the built-in CORS proxy API.
+
+### GitHub Pages
+This repository includes a GitHub Actions workflow for automatic deployment.
+
+1. Fork this repository.
+2. Go to **Settings** -> **Pages**.
+3. Under **Build and deployment** -> **Source**, select **GitHub Actions**.
+4. Push a commit to the `main` branch. The Action will automatically build and deploy the app.
+5. **Note**: GitHub Pages is a static environment. The Vercel-specific proxy API will not work. The app will default to using a public proxy (e.g., `corsproxy.io`) or you can configure your own.
 
 ## Acknowledgments
 
