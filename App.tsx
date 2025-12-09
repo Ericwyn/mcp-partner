@@ -5,7 +5,8 @@ import { RequestPanel } from './components/RequestPanel';
 import { LogViewer } from './components/LogViewer';
 import { IMcpClient, ProxyConfig } from './services/mcpClient';
 import { SseMcpClient } from './services/sseMcpClient';
-import { ConnectionStatus, LogEntry, McpTool, JsonRpcMessage, Language, Theme } from './types';
+import { StreamableHttpMcpClient } from './services/streamableHttpMcpClient';
+import { ConnectionStatus, LogEntry, McpTool, JsonRpcMessage, Language, Theme, TransportType } from './types';
 import { PanelGroup, Panel, PanelResizeHandle } from 'react-resizable-panels';
 import { Github } from 'lucide-react';
 
@@ -35,8 +36,9 @@ const App: React.FC = () => {
       return (saved === 'dark' || saved === 'light') ? saved : 'light';
   });
 
-  // Use the Interface for typing, but instantiate the concrete SSE implementation
+  // Client ref, initialized with default SSE but can be swapped
   const mcpClient = useRef<IMcpClient>(new SseMcpClient());
+  const activeTransport = useRef<TransportType>('sse');
 
   // Apply Theme & Persist
   useEffect(() => {
@@ -62,11 +64,8 @@ const App: React.FC = () => {
     setLogs(prev => [...prev, { ...entry, timestamp }]);
   };
 
-  useEffect(() => {
-    // Setup generic listeners
-    const client = mcpClient.current;
-    
-    const messageHandler = (msg: JsonRpcMessage) => {
+  // Generic message handler for logging
+  const messageHandler = useCallback((msg: JsonRpcMessage) => {
         let summary = 'Unknown Message';
         let direction: 'in' | 'out' = 'in';
         let type: 'request' | 'response' | 'notification' | 'info' = 'info';
@@ -90,27 +89,41 @@ const App: React.FC = () => {
             summary,
             details: msg
         });
-    };
-
-    const errorHandler = (err: string) => {
-        addLog({ type: 'error', direction: 'local', summary: err });
-        setStatus(ConnectionStatus.ERROR);
-    };
-
-    client.onMessage(messageHandler);
-    client.onError(errorHandler);
-
-    return () => {
-        client.disconnect();
-    };
   }, []);
 
-  const handleConnect = async (url: string, proxyConfig: ProxyConfig, headers: Record<string, string>) => {
+  const errorHandler = useCallback((err: string) => {
+        addLog({ type: 'error', direction: 'local', summary: err });
+        setStatus(ConnectionStatus.ERROR);
+  }, []);
+
+  // Set up listeners for the initial client
+  useEffect(() => {
+    mcpClient.current.onMessage(messageHandler);
+    mcpClient.current.onError(errorHandler);
+    return () => { mcpClient.current.disconnect(); };
+  }, [messageHandler, errorHandler]);
+
+
+  const handleConnect = async (url: string, proxyConfig: ProxyConfig, headers: Record<string, string>, transport: TransportType) => {
+    // 1. Check if we need to swap the client implementation
+    if (activeTransport.current !== transport) {
+        mcpClient.current.disconnect();
+        if (transport === 'http') {
+            mcpClient.current = new StreamableHttpMcpClient();
+        } else {
+            mcpClient.current = new SseMcpClient();
+        }
+        // Re-attach listeners to the new instance
+        mcpClient.current.onMessage(messageHandler);
+        mcpClient.current.onError(errorHandler);
+        activeTransport.current = transport;
+    }
+
     setStatus(ConnectionStatus.CONNECTING);
     addLog({ 
         type: 'info', 
         direction: 'local', 
-        summary: `Connecting to ${url}...`,
+        summary: `Connecting to ${url} via ${transport === 'http' ? 'Streamable HTTP' : 'SSE'}...`,
         details: { 
           ...(proxyConfig.enabled ? { proxy: proxyConfig.prefix } : {}),
           ...(Object.keys(headers).length > 0 ? { headers } : {})
@@ -122,23 +135,25 @@ const App: React.FC = () => {
     try {
       await mcpClient.current.connect(url, proxyConfig, headers);
       setStatus(ConnectionStatus.CONNECTED);
-      addLog({ type: 'info', direction: 'local', summary: 'SSE Connected. Endpoint received.' });
+      addLog({ type: 'info', direction: 'local', summary: 'Connected.' });
       
-      // Initialize Flow
-      addLog({ type: 'info', direction: 'local', summary: 'Sending initialize...' });
-      const initResult = await mcpClient.current.sendRequest('initialize', {
-          protocolVersion: '2024-11-05',
-          capabilities: {},
-          clientInfo: {
-              name: 'mcp-postman-web',
-              version: '1.0.0'
-          }
-      });
-      addLog({ type: 'info', direction: 'in', summary: 'Initialized', details: initResult });
+      // SSE Client needs manual initialization flow, HTTP Client (SDK) handles it internally
+      if (transport === 'sse') {
+          addLog({ type: 'info', direction: 'local', summary: 'Sending initialize...' });
+          const initResult = await mcpClient.current.sendRequest('initialize', {
+              protocolVersion: '2024-11-05',
+              capabilities: {},
+              clientInfo: {
+                  name: 'mcp-partner-web',
+                  version: '1.0.0'
+              }
+          });
+          addLog({ type: 'info', direction: 'in', summary: 'Initialized', details: initResult });
 
-      // Send initialized notification
-      addLog({ type: 'info', direction: 'local', summary: 'Sending initialized notification...' });
-      await mcpClient.current.sendNotification('notifications/initialized');
+          // Send initialized notification
+          addLog({ type: 'info', direction: 'local', summary: 'Sending initialized notification...' });
+          await mcpClient.current.sendNotification('notifications/initialized');
+      }
 
       // Fetch Tools
       fetchTools();
@@ -165,11 +180,20 @@ const App: React.FC = () => {
   const fetchTools = async () => {
     setLoadingTools(true);
     try {
+        // SDK 'listTools' wrapper vs Manual 'tools/list'
+        // If using SDK, we might want to use client.listTools() if exposed, but our interface is generic sendRequest.
+        // The SDK's 'request' method handles the result schema parsing if we used it directly, 
+        // but here we just expect the raw JSON-RPC response result.
         const res = await mcpClient.current.sendRequest('tools/list');
-        if (res && res.tools) {
-            setTools(res.tools);
-            addLog({ type: 'info', direction: 'in', summary: `Loaded ${res.tools.length} tools` });
-        }
+        
+        // Handle SDK result structure vs Raw JSON-RPC result structure
+        // The SDK Client.request returns the result object directly.
+        // Raw SSE returns the 'result' property of the response.
+        
+        const toolsList = res.tools || [];
+        setTools(toolsList);
+        addLog({ type: 'info', direction: 'in', summary: `Loaded ${toolsList.length} tools` });
+        
     } catch (e: any) {
         addLog({ type: 'error', direction: 'in', summary: 'Failed to list tools', details: e });
     } finally {
@@ -282,7 +306,7 @@ const App: React.FC = () => {
       <footer className="h-7 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 flex items-center justify-between px-4 text-[11px] text-gray-500 dark:text-gray-500 shrink-0 select-none shadow-[0_-1px_3px_rgba(0,0,0,0.02)] z-50">
           <div className="flex items-center gap-4">
             <span className="font-mono bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-[10px] tracking-wide text-gray-600 dark:text-gray-400">
-            v0.1.1
+            v0.1.2
             </span>
             <span>
               Author: <a href="https://github.com/Ericwyn" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors">@Ericwyn</a>
