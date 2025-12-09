@@ -66,6 +66,9 @@ export const ConnectionBar: React.FC<ConnectionBarProps> = ({
   const [showServerConfig, setShowServerConfig] = useState(false);
   const [serverConfigText, setServerConfigText] = useState('');
   const [configMode, setConfigMode] = useState<'single' | 'all'>('single');
+  
+  // State to hold a name from an import operation, waiting for a save/connect to persist it
+  const [pendingImportConfig, setPendingImportConfig] = useState<{name: string, url: string} | null>(null);
 
   // Renaming State
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -200,6 +203,12 @@ export const ConnectionBar: React.FC<ConnectionBarProps> = ({
   const upsertServerConfig = (customName?: string) => {
       // 1. Determine Name
       let name = customName;
+
+      // If we have a pending imported name and the URL matches, use it
+      if (!name && pendingImportConfig && pendingImportConfig.url === url) {
+          name = pendingImportConfig.name;
+      }
+
       if (!name) {
           // Try to find if this URL already exists to update it
           const existingEntry = Object.entries(serverRegistry).find(([_, cfg]) => (cfg as McpServerConfig).url === url);
@@ -213,13 +222,15 @@ export const ConnectionBar: React.FC<ConnectionBarProps> = ({
               } catch {
                   name = 'Server';
               }
-              // Ensure uniqueness if it's a new entry
-              if (serverRegistry[name] && serverRegistry[name].url !== url) {
-                   let counter = 1;
-                   while (serverRegistry[`${name}-${counter}`]) counter++;
-                   name = `${name}-${counter}`;
-              }
           }
+      }
+
+      // Ensure uniqueness if the determined name exists but points to a DIFFERENT URL
+      if (name && serverRegistry[name] && serverRegistry[name].url !== url) {
+           let counter = 1;
+           const baseName = name;
+           while (serverRegistry[`${baseName}-${counter}`]) counter++;
+           name = `${baseName}-${counter}`;
       }
 
       // 2. Prepare Data
@@ -243,6 +254,11 @@ export const ConnectionBar: React.FC<ConnectionBarProps> = ({
               proxyPrefix
           }
       }));
+
+      // Clear pending config if it was used
+      if (pendingImportConfig && pendingImportConfig.url === url) {
+          setPendingImportConfig(null);
+      }
   };
 
   // Auto-save effect: Trigger save when successfully connected
@@ -285,6 +301,15 @@ export const ConnectionBar: React.FC<ConnectionBarProps> = ({
     }
   };
 
+  // Helper to prevent form submission on Enter for config inputs
+  const handleEnterKey = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      e.stopPropagation();
+      (e.currentTarget as HTMLElement).blur();
+    }
+  };
+
   // Header Management
   const addHeader = () => setHeaders([...headers, { id: Math.random().toString(36).substr(2, 9), key: '', value: '' }]);
   const updateHeader = (id: string, field: 'key' | 'value', val: string) => setHeaders(headers.map(h => h.id === id ? { ...h, [field]: val } : h));
@@ -319,6 +344,7 @@ export const ConnectionBar: React.FC<ConnectionBarProps> = ({
       }
 
       setShowHistory(false);
+      setPendingImportConfig(null); // Clear any pending import when loading a saved config
   };
 
   const deleteConfig = (e: React.MouseEvent, key: string) => {
@@ -464,7 +490,10 @@ export const ConnectionBar: React.FC<ConnectionBarProps> = ({
       const foundEntry = Object.entries(serverRegistry).find(([_, cfg]) => cfg.url === url);
       
       let keyName = foundEntry ? foundEntry[0] : 'new-mcp-server';
-      if (!foundEntry) {
+      // If we have a pending name for the current URL, use that as the display name
+      if (pendingImportConfig && pendingImportConfig.url === url) {
+          keyName = pendingImportConfig.name;
+      } else if (!foundEntry) {
         try {
             const u = new URL(url);
             keyName = u.hostname.replace(/\./g, '-');
@@ -540,6 +569,7 @@ export const ConnectionBar: React.FC<ConnectionBarProps> = ({
                   };
              });
              setServerRegistry(newServers);
+             setPendingImportConfig(null);
           } else {
              // MODE: Single (Update Inputs Only)
              const keys = Object.keys(parsed.mcpServers);
@@ -549,6 +579,7 @@ export const ConnectionBar: React.FC<ConnectionBarProps> = ({
              const firstKey = keys[0];
              const rawConfig = parsed.mcpServers[firstKey] as any;
              const url = rawConfig.url || rawConfig.baseUrl;
+             const name = rawConfig.name || firstKey;
              
              // Update Inputs
              setUrl(url || '');
@@ -566,6 +597,10 @@ export const ConnectionBar: React.FC<ConnectionBarProps> = ({
              setHeaders(newHeaders);
              
              // Note: We DO NOT save to registry here. It just fills the inputs.
+             // But we store the name in pending state so it is used when the user clicks Save or Connect.
+             if (url && name) {
+                 setPendingImportConfig({ name, url });
+             }
           }
 
           setShowServerConfig(false);
@@ -633,6 +668,17 @@ export const ConnectionBar: React.FC<ConnectionBarProps> = ({
                                                 autoFocus
                                                 value={editingName}
                                                 onChange={e => setEditingName(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        saveEditing(e as any, item.key);
+                                                    } else if (e.key === 'Escape') {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        cancelEditing(e as any);
+                                                    }
+                                                }}
                                                 className="flex-1 min-w-0 text-xs px-2 py-1 rounded border border-blue-300 dark:border-blue-600 bg-white dark:bg-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                             />
                                             <button 
@@ -757,12 +803,14 @@ export const ConnectionBar: React.FC<ConnectionBarProps> = ({
                                         placeholder="Key" 
                                         value={h.key}
                                         onChange={e => updateHeader(h.id, 'key', e.target.value)}
+                                        onKeyDown={handleEnterKey}
                                         className="flex-1 w-0 text-xs px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-200 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
                                     />
                                     <input 
                                         placeholder="Value" 
                                         value={h.value}
                                         onChange={e => updateHeader(h.id, 'value', e.target.value)}
+                                        onKeyDown={handleEnterKey}
                                         className="flex-1 w-0 text-xs px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-200 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
                                     />
                                     <button type="button" onClick={() => removeHeader(h.id)} className="text-gray-400 hover:text-red-500">
@@ -797,6 +845,7 @@ export const ConnectionBar: React.FC<ConnectionBarProps> = ({
                                     className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-200 text-sm rounded-md p-2 focus:ring-green-500 focus:border-green-500"
                                     value={proxyPrefix}
                                     onChange={e => setProxyPrefix(e.target.value)}
+                                    onKeyDown={handleEnterKey}
                                     placeholder={`Default: ${globalProxyPrefix}`}
                                 />
                                 <a 
@@ -896,6 +945,7 @@ export const ConnectionBar: React.FC<ConnectionBarProps> = ({
                             type="text"
                             value={globalProxyPrefix}
                             onChange={(e) => setGlobalProxyPrefix(e.target.value)}
+                            onKeyDown={handleEnterKey}
                             className="w-full text-xs px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder-gray-400"
                         />
                    </div>
