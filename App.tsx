@@ -67,11 +67,21 @@ const App: React.FC = () => {
   // Store state (args + results) per item name (prefixed by type to avoid collision)
   const [itemStates, setItemStates] = useState<Record<string, ItemState>>({});
   
-  // Settings - Initialize from localStorage
+  // Settings - Initialize from localStorage or Auto-detect
   const [lang, setLang] = useState<Language>(() => {
       const saved = localStorage.getItem('mcp_language');
-      return (saved === 'en' || saved === 'zh') ? saved : 'zh';
+      if (saved === 'en' || saved === 'zh') {
+          return saved;
+      }
+      // Auto-detect based on browser language
+      if (typeof navigator !== 'undefined' && navigator.language) {
+          if (navigator.language.toLowerCase().startsWith('zh')) {
+              return 'zh';
+          }
+      }
+      return 'en';
   });
+
   const [theme, setTheme] = useState<Theme>(() => {
       const saved = localStorage.getItem('mcp_theme');
       return (saved === 'dark' || saved === 'light') ? saved : 'light';
