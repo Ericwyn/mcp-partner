@@ -65,6 +65,9 @@ export const translations = {
     language: 'Language',
     theme: 'Appearance',
     clearParams: 'Clear',
+    viewFullDescription: 'View Full Description',
+    toolDescription: 'Tool Description',
+    close: 'Close',
   },
   zh: {
     appTitle: 'MCP 调试助手',
@@ -129,5 +132,8 @@ export const translations = {
     language: '语言',
     theme: '外观',
     clearParams: '清空参数',
+    viewFullDescription: '查看完整介绍',
+    toolDescription: '工具介绍',
+    close: '关闭',
   }
 };
