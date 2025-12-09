@@ -138,8 +138,12 @@ class CustomStreamableTransport implements Transport {
                             responseHeaders, 
                             statusCode: response.status 
                         });
-                    } catch (e) {
-                        console.error("Failed to parse JSON response from POST", e);
+                    } catch (e: any) {
+                        const msg = `Failed to parse JSON response from POST: ${e.message}`;
+                        console.error(msg, e);
+                        if (this.onerror) {
+                            this.onerror(new Error(`${msg}. Body snippet: ${text.substring(0, 200)}`));
+                        }
                     }
                 }
             } else if (contentType.includes('text/event-stream')) {
