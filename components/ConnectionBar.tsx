@@ -65,6 +65,7 @@ export const ConnectionBar: React.FC<ConnectionBarProps> = ({
   // Import/Export Server Config State
   const [showServerConfig, setShowServerConfig] = useState(false);
   const [serverConfigText, setServerConfigText] = useState('');
+  const [configMode, setConfigMode] = useState<'single' | 'all'>('single');
 
   // Renaming State
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -411,17 +412,26 @@ export const ConnectionBar: React.FC<ConnectionBarProps> = ({
 
           if (parsed.mcpServers) {
               Object.entries(parsed.mcpServers).forEach(([key, config]) => {
-                  let finalKey = key;
+                  const rawConfig = config as any;
+                  // Support baseUrl alias
+                  const url = rawConfig.url || rawConfig.baseUrl;
+
+                  if (!url) return;
+
+                  // Support internal name as key preference
+                  const name = rawConfig.name || key;
+
+                  let finalKey = name;
                   let counter = 1;
                   // If key exists and URL is different, rename.
-                  while (newServerRegistry[finalKey] && newServerRegistry[finalKey].url !== config.url) {
-                      finalKey = `${key}-${counter++}`;
+                  while (newServerRegistry[finalKey] && newServerRegistry[finalKey].url !== url) {
+                      finalKey = `${name}-${counter++}`;
                   }
                   
                   newServerRegistry[finalKey] = {
-                      ...config,
+                      url: url,
                       type: 'sse', // Force type sse
-                      headers: config.headers ? { ...config.headers } : {} // Ensure headers exist and are copied
+                      headers: rawConfig.headers ? { ...rawConfig.headers } : {} // Ensure headers exist and are copied
                   };
                   
                   if (parsed.mcpExtensions && parsed.mcpExtensions[key]) {
@@ -447,12 +457,46 @@ export const ConnectionBar: React.FC<ConnectionBarProps> = ({
 
   // --- Server Config Import / Export (Just the MCP Servers part) ---
   const handleOpenServerConfig = () => {
-      // Create a clean JSON with only mcpServers
-      const data = {
-          mcpServers: serverRegistry
+      // DEFAULT MODE: Single Config (Current Inputs)
+      setConfigMode('single');
+
+      // 1. Identify current config name if it matches a known URL
+      const foundEntry = Object.entries(serverRegistry).find(([_, cfg]) => cfg.url === url);
+      
+      let keyName = foundEntry ? foundEntry[0] : 'new-mcp-server';
+      if (!foundEntry) {
+        try {
+            const u = new URL(url);
+            keyName = u.hostname.replace(/\./g, '-');
+        } catch {}
+      }
+
+      // 2. Prepare current headers
+      const currentHeaders: Record<string, string> = {};
+      headers.forEach(h => {
+        if (h.key.trim()) currentHeaders[h.key.trim()] = h.value;
+      });
+
+      // 3. Construct single server JSON
+      const singleConfig = {
+          mcpServers: {
+              [keyName]: {
+                  type: 'sse',
+                  name: keyName, // Added for display completeness, though not strictly in type
+                  url: url,
+                  headers: currentHeaders
+              }
+          }
       };
-      setServerConfigText(JSON.stringify(data, null, 2));
+
+      setServerConfigText(JSON.stringify(singleConfig, null, 2));
       setShowServerConfig(true);
+      setIsCopied(false);
+  };
+
+  const handleSwitchToAllConfig = () => {
+      setConfigMode('all');
+      setServerConfigText(JSON.stringify({ mcpServers: serverRegistry }, null, 2));
       setIsCopied(false);
   };
 
@@ -467,31 +511,63 @@ export const ConnectionBar: React.FC<ConnectionBarProps> = ({
           const parsed = JSON.parse(serverConfigText);
           if (!parsed.mcpServers) throw new Error("Missing 'mcpServers' key");
 
-          const newServers = { ...serverRegistry };
-          const newExtensions = { ...extensionRegistry };
+          if (configMode === 'all') {
+             // MODE: All (Bulk Import/Manage)
+             const newServers = { ...serverRegistry };
+             
+             Object.entries(parsed.mcpServers).forEach(([key, value]) => {
+                  const rawConfig = value as any;
+                  // Support baseUrl alias
+                  const url = rawConfig.url || rawConfig.baseUrl;
+                  const name = rawConfig.name || key;
 
-          // Import logic: Add new servers, auto-rename conflicts if they are different
-          Object.entries(parsed.mcpServers).forEach(([key, value]) => {
-              const config = value as McpServerConfig;
-              let finalKey = key;
-              
-              // If conflict exists
-              if (newServers[finalKey]) {
-                   // If identical, skip (or overwrite, effectively same)
-                   let counter = 1;
-                   while (newServers[finalKey]) {
-                       finalKey = `${key}-${counter++}`;
-                   }
-              }
-              
-              newServers[finalKey] = {
-                  ...config,
-                  type: 'sse', // Ensure type is sse
-                  headers: config.headers ? { ...config.headers } : {} // Ensure headers object exists and is copied
-              };
-          });
+                  if (!url) return;
+                  
+                  let finalKey = name;
+                  
+                  // If conflict exists
+                  if (newServers[finalKey]) {
+                       let counter = 1;
+                       while (newServers[finalKey]) {
+                           finalKey = `${name}-${counter++}`;
+                       }
+                  }
+                  
+                  newServers[finalKey] = {
+                      url: url,
+                      type: 'sse',
+                      headers: rawConfig.headers ? { ...rawConfig.headers } : {}
+                  };
+             });
+             setServerRegistry(newServers);
+          } else {
+             // MODE: Single (Update Inputs Only)
+             const keys = Object.keys(parsed.mcpServers);
+             if (keys.length === 0) throw new Error("No server definition found in JSON");
+             
+             // Take the first server defined
+             const firstKey = keys[0];
+             const rawConfig = parsed.mcpServers[firstKey] as any;
+             const url = rawConfig.url || rawConfig.baseUrl;
+             
+             // Update Inputs
+             setUrl(url || '');
+             
+             const newHeaders: HeaderItem[] = [];
+             if (rawConfig.headers) {
+                 Object.entries(rawConfig.headers).forEach(([k, v]) => {
+                     newHeaders.push({
+                         id: Math.random().toString(36).substr(2, 9),
+                         key: k,
+                         value: String(v)
+                     });
+                 });
+             }
+             setHeaders(newHeaders);
+             
+             // Note: We DO NOT save to registry here. It just fills the inputs.
+          }
 
-          setServerRegistry(newServers);
           setShowServerConfig(false);
       } catch(e) {
           alert(t.invalidJson + ": " + (e as any).message);
@@ -904,7 +980,7 @@ export const ConnectionBar: React.FC<ConnectionBarProps> = ({
                     <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 shrink-0">
                         <h3 className="font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
                             <FileJson className="w-4 h-4 text-purple-500" />
-                            {t.serverConfig}
+                            {configMode === 'single' ? t.currentServerConfig : t.allServerConfig}
                         </h3>
                         <button 
                             onClick={() => setShowServerConfig(false)}
@@ -915,7 +991,19 @@ export const ConnectionBar: React.FC<ConnectionBarProps> = ({
                         </button>
                     </div>
                     <div className="p-4 flex flex-col gap-2">
-                         <p className="text-sm text-gray-500 dark:text-gray-400">{t.serverConfigDesc}</p>
+                         <div className="flex justify-between items-start gap-2">
+                            <p className="text-sm text-gray-500 dark:text-gray-400 flex-1">
+                                {configMode === 'single' ? t.singleConfigDesc : t.serverConfigDesc}
+                            </p>
+                            {configMode === 'single' && (
+                                <button 
+                                    onClick={handleSwitchToAllConfig}
+                                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline shrink-0 whitespace-nowrap mt-0.5"
+                                >
+                                    {t.manageAllConfigs}
+                                </button>
+                            )}
+                         </div>
                          <textarea 
                              className="w-full h-64 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-200 font-mono text-xs p-3 rounded border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-1 focus:ring-purple-500 resize-none"
                              value={serverConfigText}
@@ -935,7 +1023,7 @@ export const ConnectionBar: React.FC<ConnectionBarProps> = ({
                             className="flex items-center gap-1.5 px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-md hover:bg-purple-500 transition-colors"
                         >
                             <Save className="w-4 h-4" />
-                            {t.save}
+                            {configMode === 'single' ? t.loadConfig : t.save}
                         </button>
                     </div>
                 </div>

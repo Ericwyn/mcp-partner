@@ -82,6 +82,11 @@ export const translations = {
     cancel: 'Cancel',
     serverNameExists: 'Name exists',
     defaultProxy: 'Default Proxy URL',
+    currentServerConfig: 'Current Server Config',
+    allServerConfig: 'All Server Configs',
+    singleConfigDesc: 'Edit the JSON to modify the current address bar and headers. Changes are applied immediately but not saved to the registry until connected.',
+    manageAllConfigs: 'Manage All Servers',
+    loadConfig: 'Load to UI',
   },
   zh: {
     appTitle: 'MCP 调试助手',
@@ -162,5 +167,10 @@ export const translations = {
     cancel: '取消',
     serverNameExists: '名称已存在',
     defaultProxy: '默认代理地址',
+    currentServerConfig: '当前服务器配置',
+    allServerConfig: '全部服务器配置',
+    singleConfigDesc: '修改 JSON 并点击加载，配置将应用到当前输入框（URL 和请求头），但不会自动保存到历史记录。',
+    manageAllConfigs: '管理全部配置',
+    loadConfig: '应用到输入框',
   }
 };
